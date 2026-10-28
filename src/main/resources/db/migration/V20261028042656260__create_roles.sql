@@ -1,0 +1,15 @@
+CREATE TABLE roles (
+    id UUID NOT NULL,
+
+    code VARCHAR(100) NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    description VARCHAR(500),
+
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_roles PRIMARY KEY (id),
+    CONSTRAINT uq_roles_code UNIQUE (code)
+);

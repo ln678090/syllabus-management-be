@@ -1,0 +1,140 @@
+name: CI - Validate Flyway Database
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "src/main/resources/db/migration/**"
+      - ".github/workflows/ci-db-validation.yml"
+
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "src/main/resources/db/migration/**"
+      - ".github/workflows/ci-db-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-flyway:
+    name: Flyway / PostgreSQL
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: syllabus_ci
+          POSTGRES_USER: ciuser
+          POSTGRES_PASSWORD: cipass
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U ciuser -d syllabus_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------------
+      # Validate Flyway migration naming convention:
+      # VyyyyMMddHHmmssSSS__description.sql
+      # -------------------------------------------------------
+      - name: Validate Flyway migration file names
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          migration_dir="src/main/resources/db/migration"
+          pattern='^V[0-9]{17}__[a-z0-9_]+\.sql$'
+
+          if [[ ! -d "$migration_dir" ]]; then
+            echo "::error::Migration directory does not exist: $migration_dir"
+            exit 1
+          fi
+
+          shopt -s nullglob
+          files=("$migration_dir"/*.sql)
+
+          if (( ${#files[@]} == 0 )); then
+            echo "::error::No Flyway SQL migrations found."
+            exit 1
+          fi
+
+          failed=0
+
+          for file in "${files[@]}"; do
+            name="$(basename "$file")"
+
+            if [[ ! "$name" =~ $pattern ]]; then
+              echo "::error file=$file::Invalid migration file name: $name"
+              failed=1
+            else
+              echo "OK: $name"
+            fi
+          done
+
+          exit "$failed"
+
+      # -------------------------------------------------------
+      # Ensure no two migrations use the same Flyway version
+      # -------------------------------------------------------
+      - name: Check duplicate Flyway versions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          duplicates="$(
+            find src/main/resources/db/migration \
+              -maxdepth 1 \
+              -type f \
+              -name 'V*.sql' \
+              -printf '%f\n' |
+            sed -E 's/^V([0-9]+)__.*/\1/' |
+            sort |
+            uniq -d
+          )"
+
+          if [[ -n "$duplicates" ]]; then
+            echo "::error::Duplicate Flyway versions found:"
+            echo "$duplicates"
+            exit 1
+          fi
+
+          echo "No duplicate Flyway versions."
+
+      # -------------------------------------------------------
+      # Run every migration on a completely empty PostgreSQL DB
+      # -------------------------------------------------------
+      - name: Run Flyway migrations
+        shell: bash
+        run: |
+          docker run --rm \
+            --network host \
+            -v "${{ github.workspace }}/src/main/resources/db/migration:/flyway/sql:ro" \
+            flyway/flyway:latest \
+            -url="jdbc:postgresql://localhost:5433/syllabus_ci" \
+            -user="ciuser" \
+            -password="cipass" \
+            -connectRetries=10 \
+            migrate
+
+      # -------------------------------------------------------
+      # Validate migrations after migrate
+      # -------------------------------------------------------
+      - name: Validate Flyway schema
+        shell: bash
+        run: |
+          docker run --rm \
+            --network host \
+            -v "${{ github.workspace }}/src/main/resources/db/migration:/flyway/sql:ro" \
+            flyway/flyway:latest \
+            -url="jdbc:postgresql://localhost:5433/syllabus_ci" \
+            -user="ciuser" \
+            -password="cipass" \
+            -connectRetries=10 \
+            validate

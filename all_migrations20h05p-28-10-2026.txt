@@ -1,0 +1,767 @@
+===== src/main/resources/db/migration/V20261028042411893__create_users.sql =====
+CREATE TABLE users (
+    id UUID NOT NULL,
+
+    username VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    last_login_at TIMESTAMPTZ,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_users PRIMARY KEY (id),
+    CONSTRAINT uq_users_username UNIQUE (username),
+    CONSTRAINT uq_users_email UNIQUE (email)
+);
+
+===== src/main/resources/db/migration/V20261028042656260__create_roles.sql =====
+CREATE TABLE roles (
+    id UUID NOT NULL,
+
+    code VARCHAR(100) NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    description VARCHAR(500),
+
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_roles PRIMARY KEY (id),
+    CONSTRAINT uq_roles_code UNIQUE (code)
+);
+
+===== src/main/resources/db/migration/V20261028042656261__create_permissions.sql =====
+-- Permission - Quyen thao tac trong he thong
+CREATE TABLE permissions (
+    id UUID NOT NULL,
+
+    code VARCHAR(150) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description VARCHAR(500),
+
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_permissions
+        PRIMARY KEY (id),
+
+    CONSTRAINT uq_permissions_code
+        UNIQUE (code)
+);
+
+===== src/main/resources/db/migration/V20261028042852054__create_user_roles.sql =====
+CREATE TABLE user_roles (
+    id UUID NOT NULL,
+
+    user_id UUID NOT NULL,
+    role_id UUID NOT NULL,
+
+    assigned_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_user_roles
+        PRIMARY KEY (id),
+
+    CONSTRAINT fk_user_roles_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_user_roles_role
+        FOREIGN KEY (role_id)
+        REFERENCES roles(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_user_roles_user_role
+        UNIQUE (user_id, role_id)
+);
+
+===== src/main/resources/db/migration/V20261028043005364__create_role_permissions.sql =====
+CREATE TABLE role_permissions (
+    id UUID NOT NULL,
+
+    role_id UUID NOT NULL,
+    permission_id UUID NOT NULL,
+
+    assigned_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_role_permissions
+        PRIMARY KEY (id),
+
+    CONSTRAINT fk_role_permissions_role
+        FOREIGN KEY (role_id)
+        REFERENCES roles(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_role_permissions_permission
+        FOREIGN KEY (permission_id)
+        REFERENCES permissions(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_role_permissions_role_permission
+        UNIQUE (role_id, permission_id)
+);
+
+===== src/main/resources/db/migration/V20261028043159053__create_user_profiles.sql =====
+CREATE TABLE user_profiles (
+    id UUID NOT NULL,
+    user_id UUID NOT NULL,
+
+    full_name VARCHAR(255) NOT NULL,
+    phone VARCHAR(20),
+    avatar_url VARCHAR(500),
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_user_profiles
+        PRIMARY KEY (id),
+
+    CONSTRAINT uq_user_profiles_user
+        UNIQUE (user_id),
+
+    CONSTRAINT fk_user_profiles_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE
+);
+
+===== src/main/resources/db/migration/V20261028043515820__create_mon_hocs.sql =====
+CREATE TABLE mon_hocs (
+    id UUID NOT NULL,
+
+    ma_mon VARCHAR(50) NOT NULL,
+    ten_mon VARCHAR(500) NOT NULL,
+    ten_tieng_anh VARCHAR(500),
+
+    external_id VARCHAR(100),
+
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+
+    created_by UUID,
+    updated_by UUID,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_mon_hocs
+        PRIMARY KEY (id),
+
+    CONSTRAINT uq_mon_hocs_ma_mon
+        UNIQUE (ma_mon),
+
+    CONSTRAINT fk_mon_hocs_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_mon_hocs_updated_by
+        FOREIGN KEY (updated_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL
+);
+
+CREATE INDEX idx_mon_hocs_ten_mon
+    ON mon_hocs (ten_mon);
+
+CREATE INDEX idx_mon_hocs_is_active
+    ON mon_hocs (is_active);
+
+===== src/main/resources/db/migration/V20261028044059672__create_de_cuongs.sql =====
+CREATE TABLE de_cuongs (
+    id UUID NOT NULL,
+
+    mon_hoc_id UUID NOT NULL,
+
+    status VARCHAR(50) NOT NULL,
+
+    created_by UUID,
+    updated_by UUID,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_de_cuongs
+        PRIMARY KEY (id),
+
+    CONSTRAINT fk_de_cuongs_mon_hoc
+        FOREIGN KEY (mon_hoc_id)
+        REFERENCES mon_hocs(id),
+
+    CONSTRAINT fk_de_cuongs_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_de_cuongs_updated_by
+        FOREIGN KEY (updated_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL
+);
+
+CREATE INDEX idx_de_cuongs_mon_hoc
+    ON de_cuongs(mon_hoc_id);
+
+CREATE INDEX idx_de_cuongs_status
+    ON de_cuongs(status);
+
+===== src/main/resources/db/migration/V20261028044059673__create_chuong_trinhs.sql =====
+-- Curriculum / Program - Chuong trinh dao tao
+CREATE TABLE chuong_trinhs (
+    id UUID NOT NULL,
+
+    ma_chuong_trinh VARCHAR(100) NOT NULL,
+    ten_chuong_trinh VARCHAR(500),
+    ten_tieng_anh VARCHAR(500),
+
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+
+    created_by UUID,
+    updated_by UUID,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_chuong_trinhs
+        PRIMARY KEY (id),
+
+    CONSTRAINT uq_chuong_trinhs_ma
+        UNIQUE (ma_chuong_trinh),
+
+    CONSTRAINT fk_chuong_trinhs_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_chuong_trinhs_updated_by
+        FOREIGN KEY (updated_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL
+);
+
+CREATE INDEX idx_chuong_trinhs_is_active
+    ON chuong_trinhs(is_active);
+
+===== src/main/resources/db/migration/V20261028044329476__create_phien_ban_de_cuongs.sql =====
+CREATE TABLE phien_ban_de_cuongs (
+    id UUID NOT NULL,
+
+    de_cuong_id UUID NOT NULL,
+    chuong_trinh_id UUID,
+
+    version_number INT NOT NULL,
+
+    document_type VARCHAR(50),
+    so_quyet_dinh VARCHAR(100),
+
+    -- Learning-Teaching Method - Phuong phap day va hoc
+    learning_teaching_method TEXT,
+
+    so_tin_chi NUMERIC(4,1),
+    bac_dao_tao VARCHAR(100),
+
+    -- Time Allocation - Phan bo thoi gian hoc
+    time_allocation TEXT,
+
+    -- Pre-Requisite - Dieu kien tien quyet
+    pre_requisite TEXT,
+
+    description TEXT,
+
+    -- Student Tasks - Nhiem vu cua sinh vien
+    student_tasks TEXT,
+
+    tools TEXT,
+    note TEXT,
+
+    -- Minimum GPA to pass - Diem toi thieu de qua mon
+    min_gpa_to_pass NUMERIC(5,2),
+
+    -- Scoring Scale - Thang diem
+    scoring_scale NUMERIC(5,2),
+
+    approved_date DATE,
+
+    created_by UUID,
+    updated_by UUID,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_phien_ban_de_cuongs
+        PRIMARY KEY (id),
+
+    CONSTRAINT fk_phien_ban_de_cuongs_de_cuong
+        FOREIGN KEY (de_cuong_id)
+        REFERENCES de_cuongs(id),
+
+    CONSTRAINT fk_phien_ban_de_cuongs_chuong_trinh
+        FOREIGN KEY (chuong_trinh_id)
+        REFERENCES chuong_trinhs(id),
+
+    CONSTRAINT fk_phien_ban_de_cuongs_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_phien_ban_de_cuongs_updated_by
+        FOREIGN KEY (updated_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT uq_phien_ban_de_cuongs_version
+        UNIQUE (de_cuong_id, version_number),
+
+    CONSTRAINT ck_phien_ban_de_cuongs_version
+        CHECK (version_number > 0)
+);
+
+CREATE INDEX idx_phien_ban_de_cuongs_de_cuong
+    ON phien_ban_de_cuongs(de_cuong_id);
+
+CREATE INDEX idx_phien_ban_de_cuongs_chuong_trinh
+    ON phien_ban_de_cuongs(chuong_trinh_id);
+
+===== src/main/resources/db/migration/V20261028044529157__create_tai_lieu_tham_khaos.sql =====
+CREATE TABLE tai_lieu_tham_khaos (
+    id UUID NOT NULL,
+
+    phien_ban_de_cuong_id UUID NOT NULL,
+
+    ten_tai_lieu TEXT NOT NULL,
+    muc_dich TEXT,
+    isbn VARCHAR(50),
+    loai VARCHAR(100),
+    ghi_chu TEXT,
+
+    tac_gia VARCHAR(500),
+    nha_xuat_ban VARCHAR(500),
+    ngay_xuat_ban VARCHAR(50),
+    phien_ban VARCHAR(100),
+
+    sort_order INT NOT NULL,
+
+    created_by UUID,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_tai_lieu_tham_khaos
+        PRIMARY KEY (id),
+
+    CONSTRAINT fk_tai_lieu_tham_khaos_phien_ban
+        FOREIGN KEY (phien_ban_de_cuong_id)
+        REFERENCES phien_ban_de_cuongs(id),
+
+    CONSTRAINT fk_tai_lieu_tham_khaos_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT uq_tai_lieu_tham_khaos_thu_tu
+        UNIQUE (phien_ban_de_cuong_id, sort_order),
+
+    CONSTRAINT ck_tai_lieu_tham_khaos_sort_order
+        CHECK (sort_order > 0)
+);
+
+CREATE INDEX idx_tai_lieu_tham_khaos_phien_ban
+    ON tai_lieu_tham_khaos(phien_ban_de_cuong_id);
+
+===== src/main/resources/db/migration/V20261028044717535__create_buoi_hocs.sql =====
+CREATE TABLE buoi_hocs (
+    id UUID NOT NULL,
+
+    phien_ban_de_cuong_id UUID NOT NULL,
+
+    so_buoi INT NOT NULL,
+    chu_de TEXT NOT NULL,
+
+    -- Learning-Teaching Method - Phuong phap day va hoc
+    learning_teaching_method VARCHAR(255),
+
+    -- ITU - Muc do I/T/U cua noi dung hoc
+    itu VARCHAR(50),
+
+    tai_lieu_sinh_vien TEXT,
+    tai_lieu_giang_vien TEXT,
+
+    hoat_dong_sinh_vien TEXT,
+    nhiem_vu_giang_vien TEXT,
+
+    student_download TEXT,
+    teacher_download TEXT,
+
+    created_by UUID,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_buoi_hocs
+        PRIMARY KEY (id),
+
+    CONSTRAINT fk_buoi_hocs_phien_ban_de_cuong
+        FOREIGN KEY (phien_ban_de_cuong_id)
+        REFERENCES phien_ban_de_cuongs(id),
+
+    CONSTRAINT fk_buoi_hocs_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT uq_buoi_hocs_phien_ban_so_buoi
+        UNIQUE (phien_ban_de_cuong_id, so_buoi),
+
+    CONSTRAINT uq_buoi_hocs_id_phien_ban
+        UNIQUE (id, phien_ban_de_cuong_id)
+);
+
+CREATE INDEX idx_buoi_hocs_phien_ban_de_cuong
+    ON buoi_hocs(phien_ban_de_cuong_id);
+
+===== src/main/resources/db/migration/V20261028044946232__create_clos.sql =====
+-- Course Learning Outcome - Chuan dau ra mon hoc
+CREATE TABLE clos (
+    id UUID NOT NULL,
+
+    phien_ban_de_cuong_id UUID NOT NULL,
+
+    ma_clo VARCHAR(50) NOT NULL,
+    mo_ta TEXT NOT NULL,
+
+    sort_order INT NOT NULL,
+
+    created_by UUID,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_clos
+        PRIMARY KEY (id),
+
+    CONSTRAINT fk_clos_phien_ban_de_cuong
+        FOREIGN KEY (phien_ban_de_cuong_id)
+        REFERENCES phien_ban_de_cuongs(id),
+
+    CONSTRAINT fk_clos_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT uq_clos_phien_ban_ma_clo
+        UNIQUE (phien_ban_de_cuong_id, ma_clo),
+
+    CONSTRAINT uq_clos_phien_ban_sort_order
+        UNIQUE (phien_ban_de_cuong_id, sort_order),
+
+    CONSTRAINT uq_clos_id_phien_ban
+        UNIQUE (id, phien_ban_de_cuong_id)
+);
+
+CREATE INDEX idx_clos_phien_ban_de_cuong
+    ON clos(phien_ban_de_cuong_id);
+
+===== src/main/resources/db/migration/V20261028045353581__create_plos.sql =====
+-- Program Learning Outcome - Chuan dau ra chuong trinh dao tao
+CREATE TABLE plos (
+    id UUID NOT NULL,
+
+    chuong_trinh_id UUID NOT NULL,
+
+    ma_plo VARCHAR(50) NOT NULL,
+    mo_ta TEXT,
+
+    sort_order INT NOT NULL,
+
+    created_by UUID,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_plos
+        PRIMARY KEY (id),
+
+    CONSTRAINT fk_plos_chuong_trinh
+        FOREIGN KEY (chuong_trinh_id)
+        REFERENCES chuong_trinhs(id),
+
+    CONSTRAINT fk_plos_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT uq_plos_chuong_trinh_ma_plo
+        UNIQUE (chuong_trinh_id, ma_plo),
+
+    CONSTRAINT uq_plos_chuong_trinh_sort_order
+        UNIQUE (chuong_trinh_id, sort_order)
+);
+
+CREATE INDEX idx_plos_chuong_trinh
+    ON plos(chuong_trinh_id);
+
+===== src/main/resources/db/migration/V20261028045455974__create_clo_plos.sql =====
+-- CLO-PLO Mapping - Anh xa chuan dau ra mon hoc voi chuan dau ra chuong trinh
+CREATE TABLE clo_plos (
+    id UUID NOT NULL,
+
+    clo_id UUID NOT NULL,
+    plo_id UUID NOT NULL,
+
+    created_by UUID,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_clo_plos
+        PRIMARY KEY (id),
+
+    CONSTRAINT fk_clo_plos_clo
+        FOREIGN KEY (clo_id)
+        REFERENCES clos(id),
+
+    CONSTRAINT fk_clo_plos_plo
+        FOREIGN KEY (plo_id)
+        REFERENCES plos(id),
+
+    CONSTRAINT fk_clo_plos_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT uq_clo_plos_clo_plo
+        UNIQUE (clo_id, plo_id)
+);
+
+CREATE INDEX idx_clo_plos_clo_id
+    ON clo_plos(clo_id);
+
+CREATE INDEX idx_clo_plos_plo_id
+    ON clo_plos(plo_id);
+
+===== src/main/resources/db/migration/V20261028045517692__create_buoi_hoc_clos.sql =====
+-- Session - CLO Mapping
+-- Lien ket buoi hoc voi chuan dau ra mon hoc trong cung mot phien ban de cuong
+CREATE TABLE buoi_hoc_clos (
+    id UUID NOT NULL,
+
+    phien_ban_de_cuong_id UUID NOT NULL,
+    buoi_hoc_id UUID NOT NULL,
+    clo_id UUID NOT NULL,
+
+    created_by UUID,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_buoi_hoc_clos
+        PRIMARY KEY (id),
+
+    CONSTRAINT fk_buoi_hoc_clos_phien_ban
+        FOREIGN KEY (phien_ban_de_cuong_id)
+        REFERENCES phien_ban_de_cuongs(id),
+
+    CONSTRAINT fk_buoi_hoc_clos_buoi_hoc_phien_ban
+        FOREIGN KEY (
+            buoi_hoc_id,
+            phien_ban_de_cuong_id
+        )
+        REFERENCES buoi_hocs (
+            id,
+            phien_ban_de_cuong_id
+        ),
+
+    CONSTRAINT fk_buoi_hoc_clos_clo_phien_ban
+        FOREIGN KEY (
+            clo_id,
+            phien_ban_de_cuong_id
+        )
+        REFERENCES clos (
+            id,
+            phien_ban_de_cuong_id
+        ),
+
+    CONSTRAINT fk_buoi_hoc_clos_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT uq_buoi_hoc_clos
+        UNIQUE (
+            buoi_hoc_id,
+            clo_id
+        )
+);
+
+CREATE INDEX idx_buoi_hoc_clos_phien_ban
+    ON buoi_hoc_clos(phien_ban_de_cuong_id);
+
+CREATE INDEX idx_buoi_hoc_clos_buoi_hoc
+    ON buoi_hoc_clos(buoi_hoc_id);
+
+CREATE INDEX idx_buoi_hoc_clos_clo
+    ON buoi_hoc_clos(clo_id);
+
+===== src/main/resources/db/migration/V20261028045552836__create_cau_hoi_kien_taos.sql =====
+-- Constructivist Question - Cau hoi kien tao
+CREATE TABLE cau_hoi_kien_taos (
+    id UUID NOT NULL,
+
+    phien_ban_de_cuong_id UUID NOT NULL,
+    buoi_hoc_id UUID,
+
+    ten_cau_hoi TEXT NOT NULL,
+    noi_dung TEXT NOT NULL,
+
+    sort_order INT NOT NULL,
+
+    created_by UUID,
+    updated_by UUID,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_cau_hoi_kien_taos
+        PRIMARY KEY (id),
+
+    CONSTRAINT fk_cau_hoi_kien_taos_phien_ban
+        FOREIGN KEY (phien_ban_de_cuong_id)
+        REFERENCES phien_ban_de_cuongs(id),
+
+    CONSTRAINT fk_cau_hoi_kien_taos_buoi_hoc_phien_ban
+        FOREIGN KEY (
+            buoi_hoc_id,
+            phien_ban_de_cuong_id
+        )
+        REFERENCES buoi_hocs (
+            id,
+            phien_ban_de_cuong_id
+        ),
+
+    CONSTRAINT fk_cau_hoi_kien_taos_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_cau_hoi_kien_taos_updated_by
+        FOREIGN KEY (updated_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT uq_cau_hoi_kien_taos_thu_tu
+        UNIQUE (phien_ban_de_cuong_id, sort_order)
+);
+
+CREATE INDEX idx_cau_hoi_kien_taos_phien_ban
+    ON cau_hoi_kien_taos(phien_ban_de_cuong_id);
+
+CREATE INDEX idx_cau_hoi_kien_taos_buoi_hoc
+    ON cau_hoi_kien_taos(buoi_hoc_id);
+
+===== src/main/resources/db/migration/V20261028045630127__create_assessments.sql =====
+-- Assessment - Thanh phan danh gia cua syllabus
+CREATE TABLE assessments (
+    id UUID NOT NULL,
+
+    phien_ban_de_cuong_id UUID NOT NULL,
+
+    assessment_component VARCHAR(255) NOT NULL,
+    assessment_type VARCHAR(100),
+
+    weight NUMERIC(7,4),
+    part INT,
+
+    minimum_completion_value NUMERIC(10,4),
+    duration VARCHAR(100),
+
+    question_type VARCHAR(255),
+    number_of_questions VARCHAR(100),
+
+    knowledge_skill_scope TEXT,
+    grading_method TEXT,
+    note TEXT,
+    reference TEXT,
+
+    sort_order INT NOT NULL,
+
+    created_by UUID,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_assessments
+        PRIMARY KEY (id),
+
+    CONSTRAINT fk_assessments_phien_ban_de_cuong
+        FOREIGN KEY (phien_ban_de_cuong_id)
+        REFERENCES phien_ban_de_cuongs(id),
+
+    CONSTRAINT fk_assessments_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT uq_assessments_phien_ban_sort_order
+        UNIQUE (phien_ban_de_cuong_id, sort_order),
+
+    CONSTRAINT uq_assessments_id_phien_ban
+        UNIQUE (id, phien_ban_de_cuong_id)
+);
+
+CREATE INDEX idx_assessments_phien_ban_de_cuong
+    ON assessments(phien_ban_de_cuong_id);
+
+===== src/main/resources/db/migration/V20261028045650205__create_assessment_clos.sql =====
+-- Assessment - CLO Mapping
+-- Lien ket thanh phan danh gia voi chuan dau ra mon hoc trong cung mot phien ban de cuong
+CREATE TABLE assessment_clos (
+    id UUID NOT NULL,
+
+    phien_ban_de_cuong_id UUID NOT NULL,
+    assessment_id UUID NOT NULL,
+    clo_id UUID NOT NULL,
+
+    created_by UUID,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_assessment_clos
+        PRIMARY KEY (id),
+
+    CONSTRAINT fk_assessment_clos_phien_ban
+        FOREIGN KEY (phien_ban_de_cuong_id)
+        REFERENCES phien_ban_de_cuongs(id),
+
+    CONSTRAINT fk_assessment_clos_assessment_phien_ban
+        FOREIGN KEY (
+            assessment_id,
+            phien_ban_de_cuong_id
+        )
+        REFERENCES assessments (
+            id,
+            phien_ban_de_cuong_id
+        ),
+
+    CONSTRAINT fk_assessment_clos_clo_phien_ban
+        FOREIGN KEY (
+            clo_id,
+            phien_ban_de_cuong_id
+        )
+        REFERENCES clos (
+            id,
+            phien_ban_de_cuong_id
+        ),
+
+    CONSTRAINT fk_assessment_clos_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT uq_assessment_clos
+        UNIQUE (assessment_id, clo_id)
+);
+
+CREATE INDEX idx_assessment_clos_phien_ban
+    ON assessment_clos(phien_ban_de_cuong_id);
+
+CREATE INDEX idx_assessment_clos_assessment
+    ON assessment_clos(assessment_id);
+
+CREATE INDEX idx_assessment_clos_clo
+    ON assessment_clos(clo_id);
+
